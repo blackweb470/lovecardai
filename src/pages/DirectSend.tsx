@@ -40,6 +40,7 @@ const DirectSend = () => {
 
   // AI generator state
   const [selectedMood, setSelectedMood] = useState("");
+  const [recipientGender, setRecipientGender] = useState("");
   const [generating, setGenerating] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
@@ -55,7 +56,7 @@ const DirectSend = () => {
 
     setGenerating(true);
     try {
-      const msg = await generateAIMessage(recipientName.trim(), selectedMood);
+      const msg = await generateAIMessage(recipientName.trim(), selectedMood, recipientGender);
       setMessage(msg);
       toast.success("Message generated! ✨");
     } catch (err: any) {
@@ -452,6 +453,28 @@ const DirectSend = () => {
                       {m.label}
                     </button>
                   ))}
+                </div>
+
+                {/* Gender Selection */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    Gender (Optional)
+                  </label>
+                  <div className="flex gap-2">
+                    {["Male", "Female", "Non-binary"].map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setRecipientGender(g === recipientGender ? "" : g)}
+                        className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${recipientGender === g
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-card text-foreground border-input hover:bg-secondary"
+                          }`}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <button
                   type="button"

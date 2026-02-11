@@ -65,10 +65,11 @@ export const uploadMedia = async (
 
 export const generateAIMessage = async (
   recipientName: string,
-  mood: string
+  mood: string,
+  gender?: string
 ): Promise<string> => {
   const { data, error } = await supabase.functions.invoke("generate-card", {
-    body: { recipientName, mood },
+    body: { recipientName, mood, gender },
   });
 
   if (error) throw error;
