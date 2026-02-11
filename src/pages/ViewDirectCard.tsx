@@ -122,10 +122,10 @@ const ViewDirectCard = () => {
                   )}
                   <button
                     onClick={handleDownloadMedia}
-                    className="absolute top-2 right-2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    className="absolute top-2 right-2 p-2.5 bg-black/60 text-white rounded-full hover:bg-black/80 transition-all shadow-md active:scale-95 z-20"
                     title="Download Media"
                   >
-                    <Download className="w-4 h-4" />
+                    <Download className="w-5 h-5" />
                   </button>
                 </div>
               )}
@@ -163,8 +163,8 @@ const ViewDirectCard = () => {
                         type="button"
                         onClick={() => setReplyEmoji(e)}
                         className={`text-xl p-1.5 rounded-lg transition-all ${replyEmoji === e
-                            ? "bg-secondary scale-110 ring-1 ring-primary/30"
-                            : "hover:bg-secondary/50"
+                          ? "bg-secondary scale-110 ring-1 ring-primary/30"
+                          : "hover:bg-secondary/50"
                           }`}
                       >
                         {e}
