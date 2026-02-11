@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Heart, ArrowLeft, Send, Loader2 } from "lucide-react";
+import { Heart, ArrowLeft, Send, Loader2, Download } from "lucide-react";
 import { fetchDirectCard, sendReply } from "@/lib/cardApi";
 import { STYLE_CLASSES, EMOJIS } from "@/lib/cardTypes";
 import FloatingHearts from "@/components/FloatingHearts";
@@ -34,6 +34,24 @@ const ViewDirectCard = () => {
       toast.error(err.message || "Failed to send reply");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleDownloadMedia = async () => {
+    if (!card?.media_url) return;
+    try {
+      const response = await fetch(card.media_url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kindred-card-${card.media_type === "video" ? "video.mp4" : "image.jpg"}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      toast.error("Failed to download media");
     }
   };
 
@@ -96,12 +114,19 @@ const ViewDirectCard = () => {
               </p>
 
               {card.media_url && (
-                <div className="mt-4 rounded-xl overflow-hidden">
+                <div className="mt-4 rounded-xl overflow-hidden relative group">
                   {card.media_type === "video" ? (
                     <video src={card.media_url} controls className="w-full max-h-64 object-cover" />
                   ) : (
                     <img src={card.media_url} alt="Card media" className="w-full max-h-64 object-cover" />
                   )}
+                  <button
+                    onClick={handleDownloadMedia}
+                    className="absolute top-2 right-2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    title="Download Media"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
                 </div>
               )}
 
@@ -137,11 +162,10 @@ const ViewDirectCard = () => {
                         key={e}
                         type="button"
                         onClick={() => setReplyEmoji(e)}
-                        className={`text-xl p-1.5 rounded-lg transition-all ${
-                          replyEmoji === e
+                        className={`text-xl p-1.5 rounded-lg transition-all ${replyEmoji === e
                             ? "bg-secondary scale-110 ring-1 ring-primary/30"
                             : "hover:bg-secondary/50"
-                        }`}
+                          }`}
                       >
                         {e}
                       </button>

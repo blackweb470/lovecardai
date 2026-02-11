@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Heart, Send, Loader2, ArrowLeft, MessageCircle, Mail, Copy, Check } from "lucide-react";
 import {
   Dialog,
@@ -63,6 +63,16 @@ const DirectSend = () => {
       setGenerating(false);
     }
   };
+
+  // Preload Paystack script
+  useEffect(() => {
+    if (!(window as any).PaystackPop) {
+      const script = document.createElement("script");
+      script.src = "https://js.paystack.co/v1/inline.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
   const actualSend = useCallback(async () => {
     setSubmitting(true);
