@@ -91,8 +91,9 @@ const ViewDirectCard = () => {
         amount: 10000, // ₦100 in kobo
         currency: "NGN",
         ref: `vc_reply_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-        callback: (response: { reference: string }) => {
+        callback: (response: any) => {
           setIsConfirmOpen(false);
+          setInitializingPayment(false); // Stop loading on success callback
 
           (async () => {
             toast.loading("Verifying payment...");
@@ -100,6 +101,7 @@ const ViewDirectCard = () => {
               const { data, error } = await supabase.functions.invoke("verify-payment", {
                 body: { reference: response.reference },
               });
+
               if (error || !data?.verified) {
                 toast.dismiss();
                 toast.error("Payment verification failed");
@@ -107,19 +109,20 @@ const ViewDirectCard = () => {
               }
               toast.dismiss();
               await actualReply();
-            } catch {
+            } catch (error) {
+              console.error(error);
               toast.dismiss();
               toast.error("Payment verification failed");
             }
           })();
         },
         onClose: () => {
-          setInitializingPayment(false);
+          setInitializingPayment(false); // Stop loading on close
           toast.info("Payment cancelled");
         },
       });
       handler.openIframe();
-      setInitializingPayment(false);
+      // Intentionally NOT setting initializingPayment(false) here to keep UI responsive/loading
     } catch (error) {
       console.error("Paystack error:", error);
       toast.error("Could not initialize payment");

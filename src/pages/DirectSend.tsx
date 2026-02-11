@@ -155,9 +155,10 @@ const DirectSend = () => {
         amount: 10000, // ₦100 in kobo
         currency: "NGN",
         ref: `vc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-        callback: (response: { reference: string }) => {
+        callback: (response: any) => {
           // Close dialog only after successful initiation or selection
           setIsConfirmOpen(false);
+          setInitializingPayment(false); // Stop loading on success callback
 
           // Paystack doesn't support async callbacks, so we wrap async logic
           (async () => {
@@ -166,6 +167,7 @@ const DirectSend = () => {
               const { data, error } = await supabase.functions.invoke("verify-payment", {
                 body: { reference: response.reference },
               });
+
               if (error || !data?.verified) {
                 toast.dismiss();
                 toast.error("Payment verification failed");
@@ -173,24 +175,22 @@ const DirectSend = () => {
               }
               toast.dismiss();
               await actualSend();
-            } catch {
+            } catch (error) {
+              console.error(error);
               toast.dismiss();
               toast.error("Payment verification failed");
             }
           })();
         },
         onClose: () => {
-          setInitializingPayment(false);
+          setInitializingPayment(false); // Stop loading on close
           toast.info("Payment cancelled");
         },
       });
 
       handler.openIframe();
-      // We keep initializingPayment=true until closed or completed to prevent double-clicks
-      // But actually, once iframe opens, we can reset checks. 
-      // However, for better UX, let's keep it loading until iframe covers screen or dialog closes? 
-      // Paystack iframe is separate.
-      setInitializingPayment(false);
+      // Intentionally NOT setting initializingPayment(false) here.
+      // We want the loading state to persist while the iframe is loading/open.
 
     } catch (error) {
       console.error("Paystack error:", error);
