@@ -1,0 +1,25 @@
+project_id = "hannqoqfsdiuieocobts"
+
+[functions.generate-card]
+verify_jwt = false
+
+[functions.create-section]
+verify_jwt = false
+
+[functions.get-section-cards]
+verify_jwt = false
+
+[functions.admin-auth]
+verify_jwt = false
+
+[functions.send-direct-card]
+verify_jwt = false
+
+[functions.view-direct-card]
+verify_jwt = false
+
+[functions.send-reply]
+verify_jwt = false
+
+[functions.verify-payment]
+verify_jwt = false

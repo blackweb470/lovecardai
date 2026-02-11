@@ -1,0 +1,112 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 350 30% 97%;
+    --foreground: 350 40% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 350 40% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 350 40% 15%;
+
+    --primary: 346 77% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 350 40% 94%;
+    --secondary-foreground: 350 40% 20%;
+
+    --muted: 350 20% 93%;
+    --muted-foreground: 350 15% 50%;
+
+    --accent: 20 70% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 350 25% 88%;
+    --input: 350 25% 88%;
+    --ring: 346 77% 55%;
+
+    --radius: 0.75rem;
+
+    --rose-glow: 346 77% 65%;
+    --warm: 20 60% 95%;
+    --gradient-hero: linear-gradient(135deg, hsl(350 30% 97%), hsl(350 40% 94%), hsl(20 60% 95%));
+    --gradient-card-1: linear-gradient(135deg, hsl(346 77% 55%), hsl(346 77% 65%));
+    --gradient-card-2: linear-gradient(135deg, hsl(280 60% 55%), hsl(320 70% 60%));
+    --gradient-card-3: linear-gradient(135deg, hsl(20 70% 55%), hsl(346 77% 55%));
+    --gradient-card-4: linear-gradient(135deg, hsl(200 60% 50%), hsl(260 50% 55%));
+
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-body: 'DM Sans', system-ui, sans-serif;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 350 20% 8%;
+    --foreground: 350 10% 90%;
+    --card: 350 20% 12%;
+    --card-foreground: 350 10% 90%;
+    --popover: 350 20% 12%;
+    --popover-foreground: 350 10% 90%;
+    --primary: 346 77% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 350 20% 18%;
+    --secondary-foreground: 350 10% 90%;
+    --muted: 350 15% 18%;
+    --muted-foreground: 350 10% 60%;
+    --accent: 20 70% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 350 15% 22%;
+    --input: 350 15% 22%;
+    --ring: 346 77% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+}
+
+@keyframes float-heart {
+  0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
+  50% { transform: translateY(-20px) rotate(10deg); opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-float-heart {
+  animation: float-heart 3s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
