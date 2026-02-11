@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Heart, ArrowLeft, Send, Loader2, Download } from "lucide-react";
@@ -6,6 +6,18 @@ import { fetchDirectCard, sendReply } from "@/lib/cardApi";
 import { STYLE_CLASSES, EMOJIS } from "@/lib/cardTypes";
 import FloatingHearts from "@/components/FloatingHearts";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
+
+const PAYSTACK_PUBLIC_KEY = "pk_live_94c4d826d01caa8b77de76c34f139e4821d7ae52";
+
 
 const ViewDirectCard = () => {
   const { token } = useParams<{ token: string }>();
@@ -13,6 +25,23 @@ const ViewDirectCard = () => {
   const [replyEmoji, setReplyEmoji] = useState("💖");
   const [sending, setSending] = useState(false);
   const [replySent, setReplySent] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [paystackLoaded, setPaystackLoaded] = useState(false);
+  const [initializingPayment, setInitializingPayment] = useState(false);
+
+  // Preload Paystack script
+  useEffect(() => {
+    if ((window as any).PaystackPop) {
+      setPaystackLoaded(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://js.paystack.co/v1/inline.js";
+    script.async = true;
+    script.onload = () => setPaystackLoaded(true);
+    script.onerror = () => toast.error("Failed to load payment gateway");
+    document.body.appendChild(script);
+  }, []);
 
   const { data: card, isLoading, error } = useQuery({
     queryKey: ["direct-card", token],
@@ -20,11 +49,7 @@ const ViewDirectCard = () => {
     enabled: !!token,
   });
 
-  const handleReply = async () => {
-    if (!replyMessage.trim()) {
-      toast.error("Write a reply message!");
-      return;
-    }
+  const actualReply = useCallback(async () => {
     setSending(true);
     try {
       await sendReply(token!, replyMessage.trim(), replyEmoji);
@@ -34,6 +59,71 @@ const ViewDirectCard = () => {
       toast.error(err.message || "Failed to send reply");
     } finally {
       setSending(false);
+    }
+  }, [token, replyMessage, replyEmoji]);
+
+  const handleInitiateReply = () => {
+    if (!replyMessage.trim()) {
+      toast.error("Write a reply message!");
+      return;
+    }
+    setIsConfirmOpen(true);
+  };
+
+  const handleConfirmPayment = async () => {
+    setInitializingPayment(true);
+
+    if (!paystackLoaded) {
+      toast.warning("Payment gateway still loading... please wait.");
+      if (!(window as any).PaystackPop) {
+        setInitializingPayment(false);
+        return;
+      }
+    }
+
+    // Default email for anonymous replies if the user didn't provide one (which they don't here)
+    const email = "customer@valcards.app";
+
+    try {
+      const handler = (window as any).PaystackPop.setup({
+        key: PAYSTACK_PUBLIC_KEY,
+        email,
+        amount: 10000, // ₦100 in kobo
+        currency: "NGN",
+        ref: `vc_reply_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        callback: (response: { reference: string }) => {
+          setIsConfirmOpen(false);
+
+          (async () => {
+            toast.loading("Verifying payment...");
+            try {
+              const { data, error } = await supabase.functions.invoke("verify-payment", {
+                body: { reference: response.reference },
+              });
+              if (error || !data?.verified) {
+                toast.dismiss();
+                toast.error("Payment verification failed");
+                return;
+              }
+              toast.dismiss();
+              await actualReply();
+            } catch {
+              toast.dismiss();
+              toast.error("Payment verification failed");
+            }
+          })();
+        },
+        onClose: () => {
+          setInitializingPayment(false);
+          toast.info("Payment cancelled");
+        },
+      });
+      handler.openIframe();
+      setInitializingPayment(false);
+    } catch (error) {
+      console.error("Paystack error:", error);
+      toast.error("Could not initialize payment");
+      setInitializingPayment(false);
     }
   };
 
@@ -116,7 +206,7 @@ const ViewDirectCard = () => {
               {card.media_url && (
                 <div className="mt-4 rounded-xl overflow-hidden relative group">
                   {card.media_type === "video" ? (
-                    <video src={card.media_url} controls className="w-full max-h-64 object-cover" />
+                    <video src={card.media_url} controls playsInline className="w-full max-h-64 object-cover" />
                   ) : (
                     <img src={card.media_url} alt="Card media" className="w-full max-h-64 object-cover" />
                   )}
@@ -173,7 +263,7 @@ const ViewDirectCard = () => {
                   </div>
 
                   <button
-                    onClick={handleReply}
+                    onClick={handleInitiateReply}
                     disabled={sending}
                     className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                   >
@@ -217,6 +307,38 @@ const ViewDirectCard = () => {
           </div>
         )}
       </main>
+
+      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Reply Payment</DialogTitle>
+            <DialogDescription>
+              Sending a reply costs ₦100. It will be sent anonymously.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-center text-lg font-medium">
+              Total: ₦100
+            </p>
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => setIsConfirmOpen(false)}
+              className="px-4 py-2 rounded-md border border-input hover:bg-accent hover:text-accent-foreground"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmPayment}
+              disabled={initializingPayment}
+              className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+            >
+              {initializingPayment && <Loader2 className="w-4 h-4 animate-spin" />}
+              Proceed to Pay
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

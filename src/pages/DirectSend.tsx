@@ -29,6 +29,7 @@ const DirectSend = () => {
   const [emoji, setEmoji] = useState("💖");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     view_token: string;
@@ -64,14 +65,22 @@ const DirectSend = () => {
     }
   };
 
+  // Paystack & Script Loading State
+  const [paystackLoaded, setPaystackLoaded] = useState(false);
+  const [initializingPayment, setInitializingPayment] = useState(false);
+
   // Preload Paystack script
   useEffect(() => {
-    if (!(window as any).PaystackPop) {
-      const script = document.createElement("script");
-      script.src = "https://js.paystack.co/v1/inline.js";
-      script.async = true;
-      document.body.appendChild(script);
+    if ((window as any).PaystackPop) {
+      setPaystackLoaded(true);
+      return;
     }
+    const script = document.createElement("script");
+    script.src = "https://js.paystack.co/v1/inline.js";
+    script.async = true;
+    script.onload = () => setPaystackLoaded(true);
+    script.onerror = () => toast.error("Failed to load payment gateway");
+    document.body.appendChild(script);
   }, []);
 
   const actualSend = useCallback(async () => {
@@ -126,54 +135,68 @@ const DirectSend = () => {
   };
 
   const handleConfirmPayment = async () => {
-    setIsConfirmOpen(false);
+    setInitializingPayment(true);
 
-    // Load Paystack inline script if not already loaded
-    if (!(window as any).PaystackPop) {
-      const script = document.createElement("script");
-      script.src = "https://js.paystack.co/v1/inline.js";
-      script.async = true;
-      await new Promise<void>((resolve, reject) => {
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Failed to load payment"));
-        document.body.appendChild(script);
-      });
+    if (!paystackLoaded) {
+      toast.warning("Payment gateway still loading... please wait.");
+      // Try verify again
+      if (!(window as any).PaystackPop) {
+        setInitializingPayment(false);
+        return;
+      }
     }
 
     const email = recipientEmail.trim() || senderEmail.trim() || "customer@valcards.app";
 
-    const handler = (window as any).PaystackPop.setup({
-      key: PAYSTACK_PUBLIC_KEY,
-      email,
-      amount: 10000, // ₦100 in kobo
-      currency: "NGN",
-      ref: `vc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-      callback: (response: { reference: string }) => {
-        // Paystack doesn't support async callbacks, so we wrap async logic
-        (async () => {
-          toast.loading("Verifying payment...");
-          try {
-            const { data, error } = await supabase.functions.invoke("verify-payment", {
-              body: { reference: response.reference },
-            });
-            if (error || !data?.verified) {
+    try {
+      const handler = (window as any).PaystackPop.setup({
+        key: PAYSTACK_PUBLIC_KEY,
+        email,
+        amount: 10000, // ₦100 in kobo
+        currency: "NGN",
+        ref: `vc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        callback: (response: { reference: string }) => {
+          // Close dialog only after successful initiation or selection
+          setIsConfirmOpen(false);
+
+          // Paystack doesn't support async callbacks, so we wrap async logic
+          (async () => {
+            toast.loading("Verifying payment...");
+            try {
+              const { data, error } = await supabase.functions.invoke("verify-payment", {
+                body: { reference: response.reference },
+              });
+              if (error || !data?.verified) {
+                toast.dismiss();
+                toast.error("Payment verification failed");
+                return;
+              }
+              toast.dismiss();
+              await actualSend();
+            } catch {
               toast.dismiss();
               toast.error("Payment verification failed");
-              return;
             }
-            toast.dismiss();
-            await actualSend();
-          } catch {
-            toast.dismiss();
-            toast.error("Payment verification failed");
-          }
-        })();
-      },
-      onClose: () => {
-        toast.info("Payment cancelled");
-      },
-    });
-    handler.openIframe();
+          })();
+        },
+        onClose: () => {
+          setInitializingPayment(false);
+          toast.info("Payment cancelled");
+        },
+      });
+
+      handler.openIframe();
+      // We keep initializingPayment=true until closed or completed to prevent double-clicks
+      // But actually, once iframe opens, we can reset checks. 
+      // However, for better UX, let's keep it loading until iframe covers screen or dialog closes? 
+      // Paystack iframe is separate.
+      setInitializingPayment(false);
+
+    } catch (error) {
+      console.error("Paystack error:", error);
+      toast.error("Could not initialize payment");
+      setInitializingPayment(false);
+    }
   };
 
   const handleCopy = async () => {
@@ -394,7 +417,7 @@ const DirectSend = () => {
                       value={senderPhone}
                       onChange={(e) => setSenderPhone(e.target.value)}
                       placeholder="+1234567890"
-                      className="w-full rounded-lg border border-input bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
+                      className="w-full rounded-lg border border-input bg-card px-4 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
                     />
                   </div>
                   <div>
@@ -404,7 +427,7 @@ const DirectSend = () => {
                       value={senderEmail}
                       onChange={(e) => setSenderEmail(e.target.value)}
                       placeholder="you@email.com"
-                      className="w-full rounded-lg border border-input bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
+                      className="w-full rounded-lg border border-input bg-card px-4 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
                     />
                   </div>
                 </div>
@@ -521,7 +544,7 @@ const DirectSend = () => {
                   {mediaPreview && (
                     <div className="mt-3 rounded-xl overflow-hidden">
                       {mediaFile?.type.startsWith("video") ? (
-                        <video src={mediaPreview} controls className="w-full max-h-32 object-cover" />
+                        <video src={mediaPreview} controls playsInline className="w-full max-h-32 object-cover" />
                       ) : (
                         <img src={mediaPreview} alt="Attached" className="w-full max-h-32 object-cover" />
                       )}
@@ -576,8 +599,10 @@ const DirectSend = () => {
               </button>
               <button
                 onClick={handleConfirmPayment}
-                className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+                disabled={initializingPayment}
+                className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
               >
+                {initializingPayment && <Loader2 className="w-4 h-4 animate-spin" />}
                 Proceed to Pay
               </button>
             </DialogFooter>
