@@ -144,11 +144,11 @@ export const adminAuth = async (
 // ─── Share URLs ───
 
 export const getSectionShareUrl = (slug: string): string => {
-  return `${window.location.origin}${window.location.pathname}#/s/${slug}`;
+  return `${window.location.origin}/s/${slug}`;
 };
 
 export const getSectionAdminUrl = (slug: string, adminToken: string): string => {
-  return `${window.location.origin}${window.location.pathname}#/s/${slug}/admin?token=${adminToken}`;
+  return `${window.location.origin}/s/${slug}/admin?token=${adminToken}`;
 };
 
 export const getWhatsAppShareUrl = (slug: string, sectionName: string): string => {
@@ -165,7 +165,7 @@ export const getEmailShareUrl = (slug: string, sectionName: string): string => {
 };
 
 export const getDirectCardViewUrl = (viewToken: string): string => {
-  return `${window.location.origin}${window.location.pathname}#/view/${viewToken}`;
+  return `${window.location.origin}/view/${viewToken}`;
 };
 
 export const getDirectCardWhatsAppUrl = (viewToken: string, recipientName: string): string => {
