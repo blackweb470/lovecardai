@@ -1,5 +1,13 @@
 import { useState, useCallback } from "react";
 import { Heart, Send, Loader2, ArrowLeft, MessageCircle, Mail, Copy, Check } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { STYLE_CLASSES, EMOJIS, MOODS } from "@/lib/cardTypes";
 import { sendDirectCard, uploadMedia, generateAIMessage, getDirectCardWhatsAppUrl, getDirectCardEmailUrl, getDirectCardViewUrl } from "@/lib/cardApi";
 import MediaUpload from "@/components/MediaUpload";
@@ -32,6 +40,7 @@ const DirectSend = () => {
   // AI generator state
   const [selectedMood, setSelectedMood] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const handleGenerateAI = async () => {
     if (!recipientName.trim()) {
@@ -93,7 +102,7 @@ const DirectSend = () => {
     }
   }, [recipientName, recipientPhone, recipientEmail, message, emoji, style, mediaFile, senderPhone, senderEmail]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleInitiateSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!recipientName.trim() || !message.trim()) {
       toast.error("Fill in the name and message!");
@@ -103,6 +112,11 @@ const DirectSend = () => {
       toast.error("Enter a phone number or email to send the card!");
       return;
     }
+    setIsConfirmOpen(true);
+  };
+
+  const handleConfirmPayment = async () => {
+    setIsConfirmOpen(false);
 
     // Load Paystack inline script if not already loaded
     if (!(window as any).PaystackPop) {
@@ -307,7 +321,7 @@ const DirectSend = () => {
           </div>
         ) : (
           <div className="bg-card rounded-2xl border border-border p-6 md:p-8 shadow-sm animate-fade-in-up">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleInitiateSend} className="space-y-6">
               {/* Recipient */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -398,8 +412,8 @@ const DirectSend = () => {
                       type="button"
                       onClick={() => setSelectedMood(m.value)}
                       className={`text-xs px-2.5 py-1.5 rounded-full transition-all ${selectedMood === m.value
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                         }`}
                     >
                       {m.label}
@@ -459,8 +473,8 @@ const DirectSend = () => {
                       type="button"
                       onClick={() => setStyle(i)}
                       className={`h-12 w-12 rounded-xl ${cls} transition-all ${style === i
-                          ? "ring-2 ring-foreground ring-offset-2 ring-offset-background scale-110"
-                          : "opacity-70 hover:opacity-100"
+                        ? "ring-2 ring-foreground ring-offset-2 ring-offset-background scale-110"
+                        : "opacity-70 hover:opacity-100"
                         }`}
                     />
                   ))}
@@ -477,8 +491,8 @@ const DirectSend = () => {
                       type="button"
                       onClick={() => setEmoji(e)}
                       className={`text-2xl p-2 rounded-lg transition-all ${emoji === e
-                          ? "bg-secondary scale-110 ring-1 ring-primary/30"
-                          : "hover:bg-secondary/50"
+                        ? "bg-secondary scale-110 ring-1 ring-primary/30"
+                        : "hover:bg-secondary/50"
                         }`}
                     >
                       {e}
@@ -508,6 +522,7 @@ const DirectSend = () => {
               </div>
 
               {/* Submit */}
+              {/* Submit */}
               <button
                 type="submit"
                 disabled={submitting}
@@ -521,13 +536,43 @@ const DirectSend = () => {
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    Send Anonymously — ₦100
+                    Send Anonymously
                   </>
                 )}
               </button>
             </form>
           </div>
         )}
+
+        <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm Payment</DialogTitle>
+              <DialogDescription>
+                You are about to send an anonymous card. A fee of ₦100 applies.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-center text-lg font-medium">
+                Total: ₦100
+              </p>
+            </div>
+            <DialogFooter>
+              <button
+                onClick={() => setIsConfirmOpen(false)}
+                className="px-4 py-2 rounded-md border border-input hover:bg-accent hover:text-accent-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmPayment}
+                className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Proceed to Pay
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
