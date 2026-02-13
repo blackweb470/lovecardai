@@ -18,8 +18,17 @@ const CreateCardForm = ({ sectionId, onCreated }: CreateCardFormProps) => {
   const [emoji, setEmoji] = useState("💖");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [isAiGenerated, setIsAiGenerated] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+
+  // Word count utility
+  const getWordCount = (text: string) => {
+    return text.trim().split(/\s+/).filter(Boolean).length;
+  };
+
+  const wordLimit = isAiGenerated ? 300 : 1000;
+  const currentWordCount = getWordCount(message);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +55,7 @@ const CreateCardForm = ({ sectionId, onCreated }: CreateCardFormProps) => {
         emoji,
         media_url,
         media_type,
-        is_ai_generated: false,
+        is_ai_generated: isAiGenerated,
         section_id: sectionId,
       });
 
@@ -69,6 +78,7 @@ const CreateCardForm = ({ sectionId, onCreated }: CreateCardFormProps) => {
     setMediaFile(null);
     setMediaPreview(null);
     setSent(false);
+    setIsAiGenerated(false);
   };
 
   if (sent) {
@@ -109,7 +119,10 @@ const CreateCardForm = ({ sectionId, onCreated }: CreateCardFormProps) => {
       {/* AI Generator */}
       <AIGenerator
         recipientName={to}
-        onGenerated={(msg) => setMessage(msg)}
+        onGenerated={(msg) => {
+          setMessage(msg);
+          setIsAiGenerated(true);
+        }}
       />
 
       {/* Message */}
@@ -119,13 +132,25 @@ const CreateCardForm = ({ sectionId, onCreated }: CreateCardFormProps) => {
         </label>
         <textarea
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            // If the user starts typing manually after AI generation, we still consider the start AI but if it diverges significantly we might want to reset? 
+            // For now, let's say if they type, it's human unless it was JUST generated.
+            // Actually, let's keep it simple: if you edit it, it's human written.
+            setIsAiGenerated(false);
+          }}
           placeholder="Write something kind, funny, spicy, or heartfelt..."
           rows={4}
           className="w-full rounded-lg border border-input bg-card px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all resize-none"
-          maxLength={300}
         />
-        <p className="mt-1 text-xs text-muted-foreground text-right">{message.length}/300</p>
+        <div className="flex justify-between mt-1">
+          <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+            {isAiGenerated ? "✨ AI Generated (300 words max)" : "✍️ Human Written (1000 words max)"}
+          </p>
+          <p className={`text-xs ${currentWordCount > wordLimit ? "text-destructive font-bold" : "text-muted-foreground"}`}>
+            {currentWordCount}/{wordLimit} words
+          </p>
+        </div>
       </div>
 
       {/* Media upload */}
@@ -147,11 +172,10 @@ const CreateCardForm = ({ sectionId, onCreated }: CreateCardFormProps) => {
               key={i}
               type="button"
               onClick={() => setStyle(i)}
-              className={`h-12 w-12 rounded-xl ${cls} transition-all ${
-                style === i
+              className={`h-12 w-12 rounded-xl ${cls} transition-all ${style === i
                   ? "ring-2 ring-foreground ring-offset-2 ring-offset-background scale-110"
                   : "opacity-70 hover:opacity-100"
-              }`}
+                }`}
             />
           ))}
         </div>
@@ -166,11 +190,10 @@ const CreateCardForm = ({ sectionId, onCreated }: CreateCardFormProps) => {
               key={e}
               type="button"
               onClick={() => setEmoji(e)}
-              className={`text-2xl p-2 rounded-lg transition-all ${
-                emoji === e
+              className={`text-2xl p-2 rounded-lg transition-all ${emoji === e
                   ? "bg-secondary scale-110 ring-1 ring-primary/30"
                   : "hover:bg-secondary/50"
-              }`}
+                }`}
             >
               {e}
             </button>

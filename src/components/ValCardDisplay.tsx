@@ -26,6 +26,7 @@ const ValCardDisplay = ({ card, showShare = false }: ValCardDisplayProps) => {
             <img
               src={card.media_url}
               alt="Card media"
+              crossOrigin="anonymous"
               className="w-full max-h-48 object-cover"
             />
           )}

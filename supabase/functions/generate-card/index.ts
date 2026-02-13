@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -32,7 +32,8 @@ serve(async (req) => {
             {
               role: "system",
               content: `You are a creative writer who crafts heartfelt, fun anonymous Valentine/appreciation cards. 
-Write a short card message (2-4 sentences max) that is ${mood || "sweet and uplifting"}. 
+Write a card message that is ${mood || "sweet and uplifting"}. 
+The message can be as long as needed, up to a maximum of 300 words.
 The card is anonymous — never reveal who it's from.
 Be creative, warm, and genuine. Add a touch of humor if appropriate.
 Respond with ONLY the card message text, nothing else. No quotes, no labels.`,

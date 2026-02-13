@@ -41,8 +41,17 @@ const DirectSend = () => {
   // AI generator state
   const [selectedMood, setSelectedMood] = useState("");
   const [recipientGender, setRecipientGender] = useState("");
+  const [isAiGenerated, setIsAiGenerated] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+  // Word count utility
+  const getWordCount = (text: string) => {
+    return text.trim().split(/\s+/).filter(Boolean).length;
+  };
+
+  const wordLimit = isAiGenerated ? 300 : 1000;
+  const currentWordCount = getWordCount(message);
 
   const handleGenerateAI = async () => {
     if (!recipientName.trim()) {
@@ -58,6 +67,7 @@ const DirectSend = () => {
     try {
       const msg = await generateAIMessage(recipientName.trim(), selectedMood, recipientGender);
       setMessage(msg);
+      setIsAiGenerated(true);
       toast.success("Message generated! ✨");
     } catch (err: any) {
       toast.error(err.message || "Failed to generate");
@@ -225,6 +235,7 @@ const DirectSend = () => {
     setMediaPreview(null);
     setResult(null);
     setSelectedMood("");
+    setIsAiGenerated(false);
   };
 
   return (
@@ -500,13 +511,22 @@ const DirectSend = () => {
                 </label>
                 <textarea
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  onChange={(e) => {
+                    setMessage(e.target.value);
+                    setIsAiGenerated(false);
+                  }}
                   placeholder="Write something kind, funny, spicy, or heartfelt..."
                   rows={4}
                   className="w-full rounded-lg border border-input bg-card px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all resize-none"
-                  maxLength={300}
                 />
-                <p className="mt-1 text-xs text-muted-foreground text-right">{message.length}/300</p>
+                <div className="flex justify-between mt-1">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                    {isAiGenerated ? "✨ AI Generated (300 words max)" : "✍️ Human Written (1000 words max)"}
+                  </p>
+                  <p className={`text-xs ${currentWordCount > wordLimit ? "text-destructive font-bold" : "text-muted-foreground"}`}>
+                    {currentWordCount}/{wordLimit} words
+                  </p>
+                </div>
               </div>
 
               {/* Media */}

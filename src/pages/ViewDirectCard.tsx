@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Heart, ArrowLeft, Send, Loader2, Download } from "lucide-react";
+import { Heart, ArrowLeft, Send, Loader2, Download, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
+import { toPng } from "html-to-image";
+import html2canvas from "html2canvas";
+import { useRef } from "react";
 import { fetchDirectCard, sendReply } from "@/lib/cardApi";
 import { STYLE_CLASSES, EMOJIS } from "@/lib/cardTypes";
 import FloatingHearts from "@/components/FloatingHearts";
@@ -28,6 +31,10 @@ const ViewDirectCard = () => {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [paystackLoaded, setPaystackLoaded] = useState(false);
   const [initializingPayment, setInitializingPayment] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadingVideo, setDownloadingVideo] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Preload Paystack script
   useEffect(() => {
@@ -148,6 +155,182 @@ const ViewDirectCard = () => {
     }
   };
 
+  const handleDownloadCard = async () => {
+    if (!cardRef.current) return;
+    setDownloading(true);
+    toast.loading("Preparing your card image...");
+
+    try {
+      // Small delay to ensure all assets are loaded after a refresh
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const dataUrl = await toPng(cardRef.current, {
+        cacheBust: true,
+        quality: 1,
+        pixelRatio: 2, // Higher quality
+      });
+
+      const link = document.createElement('a');
+      link.download = `val-card-${card?.recipient_name || 'anonymous'}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.dismiss();
+      toast.success("Card downloaded successfully! 📸");
+    } catch (err) {
+      console.error('Failed to download card:', err);
+      toast.dismiss();
+      toast.error("Failed to download card image");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleDownloadVideo = async () => {
+    if (!videoRef.current || !cardRef.current) return;
+
+    setDownloadingVideo(true);
+    const toastId = toast.loading("Preparing your card video... This may take a moment.");
+
+    try {
+      const video = videoRef.current;
+      const card = cardRef.current;
+
+      // Ensure video is loaded and ready
+      if (video.readyState < 2) {
+        await new Promise(resolve => {
+          video.oncanplay = resolve;
+        });
+      }
+
+      // Calculate video position relative to card
+      const videoRect = video.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const relativeX = videoRect.left - cardRect.left;
+      const relativeY = videoRect.top - cardRect.top;
+      const relativeWidth = videoRect.width;
+      const relativeHeight = videoRect.height;
+
+      // 1. Capture the overlay (text, styles, etc.) without the video
+      const originalVideoOpacity = video.style.opacity;
+      video.style.opacity = '0';
+
+      const overlayCanvas = await html2canvas(card, {
+        backgroundColor: null,
+        logging: false,
+        useCORS: true,
+        scale: 2,
+      });
+      video.style.opacity = originalVideoOpacity;
+
+      // 2. Prepare canvas for compositing
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error("Failed to get canvas context");
+
+      // Use a standard portrait/landscape aspect ratio based on card or video
+      // Let's use the overlay capture size as the base
+      canvas.width = overlayCanvas.width;
+      canvas.height = overlayCanvas.height;
+
+      // 3. Setup MediaRecorder with Audio
+      const canvasStream = canvas.captureStream(30);
+
+      // Try to get audio from video
+      let finalStream = canvasStream;
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const source = audioContext.createMediaElementSource(video);
+        const destination = audioContext.createMediaStreamDestination();
+        source.connect(destination);
+        source.connect(audioContext.destination); // Also play to user
+
+        const audioTracks = destination.stream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          finalStream = new MediaStream([...canvasStream.getTracks(), ...audioTracks]);
+        }
+      } catch (audioErr) {
+        console.warn("Could not capture audio:", audioErr);
+      }
+
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
+
+      const mediaRecorder = new MediaRecorder(finalStream, {
+        mimeType,
+        bitsPerSecond: 5000000
+      });
+
+      const chunks: Blob[] = [];
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+
+      return new Promise<void>((resolve, reject) => {
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `val-card-${card?.id || Date.now()}.webm`;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast.dismiss(toastId);
+          toast.success("Video downloaded successfully! 🎬");
+          setDownloadingVideo(false);
+        };
+
+        mediaRecorder.onerror = (e) => {
+          console.error("MediaRecorder error:", e);
+          reject(e);
+        };
+
+        // 4. Start recording and play video
+        const originalTime = video.currentTime;
+        video.currentTime = 0;
+
+        mediaRecorder.start();
+
+        const drawFrame = () => {
+          if (video.paused || video.ended) {
+            mediaRecorder.stop();
+            return;
+          }
+
+          // Clear canvas
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Draw card overlay first (including background)
+          ctx.drawImage(overlayCanvas, 0, 0);
+
+          // Draw video frame on top of its placeholder
+          // Scale relative coordinates to canvas scale (which is 2x based on html2canvas scale: 2)
+          ctx.drawImage(
+            video,
+            relativeX * 2,
+            relativeY * 2,
+            relativeWidth * 2,
+            relativeHeight * 2
+          );
+
+          requestAnimationFrame(drawFrame);
+        };
+
+        video.play().then(() => {
+          drawFrame();
+        }).catch(err => {
+          console.error("Video play failed:", err);
+          mediaRecorder.stop();
+          reject(err);
+        });
+      });
+
+    } catch (err) {
+      console.error('Failed to download card video:', err);
+      toast.dismiss(toastId);
+      toast.error("Failed to generate card video");
+      setDownloadingVideo(false);
+    }
+  };
+
   return (
     <div className="min-h-screen relative" style={{ background: "var(--gradient-hero)" }}>
       <FloatingHearts />
@@ -196,7 +379,8 @@ const ViewDirectCard = () => {
         ) : (
           <div className="animate-fade-in-up space-y-6">
             <div
-              className={`${STYLE_CLASSES[card.style] || STYLE_CLASSES[0]} rounded-2xl p-8 text-white shadow-xl`}
+              ref={cardRef}
+              className={`${STYLE_CLASSES[card.style] || STYLE_CLASSES[0]} rounded-2xl p-8 text-white shadow-xl relative overflow-hidden`}
             >
               <span className="text-5xl mb-4 block">{card.emoji}</span>
               <p className="font-display text-2xl font-semibold mb-4">
@@ -209,9 +393,16 @@ const ViewDirectCard = () => {
               {card.media_url && (
                 <div className="mt-4 rounded-xl overflow-hidden relative group">
                   {card.media_type === "video" ? (
-                    <video src={card.media_url} controls playsInline className="w-full max-h-64 object-cover" />
+                    <video
+                      ref={videoRef}
+                      src={card.media_url}
+                      controls
+                      playsInline
+                      crossOrigin="anonymous"
+                      className="w-full max-h-64 object-cover"
+                    />
                   ) : (
-                    <img src={card.media_url} alt="Card media" className="w-full max-h-64 object-cover" />
+                    <img src={card.media_url} alt="Card media" crossOrigin="anonymous" className="w-full max-h-64 object-cover" />
                   )}
                   <button
                     onClick={handleDownloadMedia}
@@ -227,6 +418,44 @@ const ViewDirectCard = () => {
                 — sent anonymously 💌
               </p>
             </div>
+
+            <button
+              onClick={handleDownloadCard}
+              disabled={downloading}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-secondary px-6 py-3 font-semibold text-secondary-foreground shadow-md hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            >
+              {downloading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating Image...
+                </>
+              ) : (
+                <>
+                  <ImageIcon className="w-4 h-4" />
+                  Download Card as Image
+                </>
+              )}
+            </button>
+
+            {card.media_type === "video" && (
+              <button
+                onClick={handleDownloadVideo}
+                disabled={downloadingVideo}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 font-semibold text-accent-foreground shadow-md hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              >
+                {downloadingVideo ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Recording Video...
+                  </>
+                ) : (
+                  <>
+                    <VideoIcon className="w-4 h-4" />
+                    Download Card as Video
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Reply section - only show if sender enabled replies */}
             {card.can_reply && !replySent && (
