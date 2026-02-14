@@ -157,18 +157,56 @@ const DirectSend = () => {
       }
     }
 
-    const email = recipientEmail.trim() || senderEmail.trim() || "customer@valcards.app";
+    // Require a real email - no fallback to prevent fraud detection
+    const email = recipientEmail.trim() || senderEmail.trim();
+    if (!email) {
+      toast.error("Please provide an email address for payment verification");
+      setInitializingPayment(false);
+      setIsConfirmOpen(true);
+      return;
+    }
 
     try {
+      // Generate a cryptographically strong unique reference
+      const uniqueRef = `vc_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
+
       const handler = (window as any).PaystackPop.setup({
         key: PAYSTACK_PUBLIC_KEY,
         email,
         amount: 10000, // ₦100 in kobo
         currency: "NGN",
-        ref: `vc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        ref: uniqueRef,
+        // Add metadata to help with fraud detection
+        metadata: {
+          custom_fields: [
+            {
+              display_name: "Recipient Name",
+              variable_name: "recipient_name",
+              value: recipientName.trim()
+            },
+            {
+              display_name: "Service Type",
+              variable_name: "service_type",
+              value: "Anonymous Valentine Card"
+            },
+            {
+              display_name: "Card Style",
+              variable_name: "card_style",
+              value: `Style ${style}`
+            },
+            {
+              display_name: "Has Media",
+              variable_name: "has_media",
+              value: mediaFile ? "Yes" : "No"
+            }
+          ],
+          recipient_name: recipientName.trim(),
+          sender_contact: senderPhone.trim() || senderEmail.trim() || "anonymous",
+          transaction_type: "valentine_card",
+          platform: "web",
+          timestamp: new Date().toISOString()
+        },
         callback: (response: any) => {
-          // Close dialog only after successful initiation or selection
-          setIsConfirmOpen(false);
           setInitializingPayment(false); // Stop loading on success callback
 
           // Paystack doesn't support async callbacks, so we wrap async logic
@@ -199,9 +237,9 @@ const DirectSend = () => {
         },
       });
 
+      // Close dialog before opening Paystack iframe to prevent UI interference
+      setIsConfirmOpen(false);
       handler.openIframe();
-      // Intentionally NOT setting initializingPayment(false) here.
-      // We want the loading state to persist while the iframe is loading/open.
 
     } catch (error) {
       console.error("Paystack error:", error);

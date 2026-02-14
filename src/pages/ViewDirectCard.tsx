@@ -88,18 +88,49 @@ const ViewDirectCard = () => {
       }
     }
 
-    // Default email for anonymous replies if the user didn't provide one (which they don't here)
-    const email = "customer@valcards.app";
+    // For replies, we need an email - use card recipient email if available, or require user to provide
+    const email = card?.recipient_email || "reply@valcards.app";
 
     try {
+      // Generate a cryptographically strong unique reference
+      const uniqueRef = `vc_reply_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
+
       const handler = (window as any).PaystackPop.setup({
         key: PAYSTACK_PUBLIC_KEY,
         email,
         amount: 10000, // ₦100 in kobo
         currency: "NGN",
-        ref: `vc_reply_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        ref: uniqueRef,
+        // Add metadata to help with fraud detection
+        metadata: {
+          custom_fields: [
+            {
+              display_name: "Transaction Type",
+              variable_name: "transaction_type",
+              value: "Reply to Valentine Card"
+            },
+            {
+              display_name: "Original Card Recipient",
+              variable_name: "original_recipient",
+              value: card?.recipient_name || "Unknown"
+            },
+            {
+              display_name: "Reply Emoji",
+              variable_name: "reply_emoji",
+              value: replyEmoji
+            },
+            {
+              display_name: "Service Type",
+              variable_name: "service_type",
+              value: "Anonymous Reply Card"
+            }
+          ],
+          original_card_id: card?.id,
+          transaction_type: "valentine_reply",
+          platform: "web",
+          timestamp: new Date().toISOString()
+        },
         callback: (response: any) => {
-          setIsConfirmOpen(false);
           setInitializingPayment(false); // Stop loading on success callback
 
           (async () => {
@@ -128,8 +159,10 @@ const ViewDirectCard = () => {
           toast.info("Payment cancelled");
         },
       });
+
+      // Close dialog before opening Paystack iframe to prevent UI interference
+      setIsConfirmOpen(false);
       handler.openIframe();
-      // Intentionally NOT setting initializingPayment(false) here to keep UI responsive/loading
     } catch (error) {
       console.error("Paystack error:", error);
       toast.error("Could not initialize payment");
