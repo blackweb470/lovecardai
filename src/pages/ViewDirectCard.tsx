@@ -91,8 +91,9 @@ const ViewDirectCard = () => {
     // Generate a cryptographically strong unique reference
     const uniqueRef = `vc_reply_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
 
-    // For anonymous replies: use card recipient email OR generate unique transaction email
-    const email = card?.recipient_email || `tx_${uniqueRef.substring(9, 25)}@valcards.app`;
+    // For anonymous replies: use the card recipient's email (since they are the one paying/replying) 
+    // OR generate unique transaction email if they didn't provide one originally.
+    const email = card?.recipient_email || `tx_reply_${uniqueRef.substring(9, 25)}@valcards.app`;
 
     try {
 
@@ -141,17 +142,30 @@ const ViewDirectCard = () => {
                 body: { reference: response.reference },
               });
 
-              if (error || !data?.verified) {
+              console.log("Payment verification response:", { data, error });
+
+              if (error) {
                 toast.dismiss();
-                toast.error("Payment verification failed");
+                toast.error(error.message || "Payment verification failed");
+                console.error("Verification error:", error);
                 return;
               }
+
+              if (!data?.verified) {
+                toast.dismiss();
+                const errorMsg = data?.error || "Payment verification failed";
+                const details = data?.details ? ` (${data.details})` : "";
+                toast.error(errorMsg + details);
+                console.error("Verification failed:", data);
+                return;
+              }
+
               toast.dismiss();
               await actualReply();
             } catch (error) {
-              console.error(error);
+              console.error("Payment verification exception:", error);
               toast.dismiss();
-              toast.error("Payment verification failed");
+              toast.error("Payment verification failed. Please contact support.");
             }
           })();
         },

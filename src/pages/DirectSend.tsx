@@ -160,9 +160,9 @@ const DirectSend = () => {
     // Generate a cryptographically strong unique reference
     const uniqueRef = `vc_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
 
-    // For anonymity: use provided email OR generate unique transaction email to avoid fraud detection
-    // This prevents the fraud system from flagging repeated generic emails while maintaining anonymity
-    const email = recipientEmail.trim() || senderEmail.trim() || `tx_${uniqueRef.substring(3, 19)}@valcards.app`;
+    // For anonymity: use provided SENDER email (if they want a receipt) OR generate unique transaction email.
+    // We intentionally DO NOT use recipientEmail here to avoid spoiling the surprise with a Paystack receipt.
+    const email = senderEmail.trim() || `tx_send_${uniqueRef.substring(3, 19)}@valcards.app`;
 
     try {
 
@@ -213,17 +213,30 @@ const DirectSend = () => {
                 body: { reference: response.reference },
               });
 
-              if (error || !data?.verified) {
+              console.log("Payment verification response:", { data, error });
+
+              if (error) {
                 toast.dismiss();
-                toast.error("Payment verification failed");
+                toast.error(error.message || "Payment verification failed");
+                console.error("Verification error:", error);
                 return;
               }
+
+              if (!data?.verified) {
+                toast.dismiss();
+                const errorMsg = data?.error || "Payment verification failed";
+                const details = data?.details ? ` (${data.details})` : "";
+                toast.error(errorMsg + details);
+                console.error("Verification failed:", data);
+                return;
+              }
+
               toast.dismiss();
               await actualSend();
             } catch (error) {
-              console.error(error);
+              console.error("Payment verification exception:", error);
               toast.dismiss();
-              toast.error("Payment verification failed");
+              toast.error("Payment verification failed. Please contact support.");
             }
           })();
         },
