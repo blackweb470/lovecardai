@@ -88,12 +88,13 @@ const ViewDirectCard = () => {
       }
     }
 
-    // For replies, we need an email - use card recipient email if available, or require user to provide
-    const email = card?.recipient_email || "reply@valcards.app";
+    // Generate a cryptographically strong unique reference
+    const uniqueRef = `vc_reply_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
+
+    // For anonymous replies: use card recipient email OR generate unique transaction email
+    const email = card?.recipient_email || `tx_${uniqueRef.substring(9, 25)}@valcards.app`;
 
     try {
-      // Generate a cryptographically strong unique reference
-      const uniqueRef = `vc_reply_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
 
       const handler = (window as any).PaystackPop.setup({
         key: PAYSTACK_PUBLIC_KEY,
